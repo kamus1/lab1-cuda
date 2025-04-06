@@ -60,18 +60,17 @@ void funcionCPU(float *R, float *G, float *B, float *Rout, float *Gout, float *B
 		int imsize = M*N;
 
 		for( int i=0; i< imsize; ++i){ //por cada pixel en la imagen
-			//calcular suma
-			float sumaR = 0;
-			float sumaG = 0;
-			float sumaB = 0;
+			Rout[i] = 0;
+			Gout[i] = 0;
+			Bout[i] = 0;
 			for( int j=0; j < L; ++j){ //recorrer cantidad de imagenes
-				sumaR += R[i + j*imsize];
-				sumaG += G[i + j*imsize];
-				sumaB += B[i + j*imsize];
+				Rout[i] += R[i + j*imsize];
+				Gout[i] += G[i + j*imsize];
+				Bout[i] += B[i + j*imsize];
 			}
-			Rout[i] = (sumaR)/L ;
-			Gout[i] = (sumaG)/L ;
-			Bout[i] = (sumaB)/L ;
+			Rout[i] /= L;
+			Gout[i] /= L;
+			Bout[i] /= L;
 		}
 }
 
