@@ -75,11 +75,35 @@ void funcionCPU(float *R, float *G, float *B, float *Rout, float *Gout, float *B
 		}
 }
 
-/*
+
+ /*
+
+ R [i1 i2..... in, in+1 ] Rout 
+ 
+ 
+ G [i1..... in, ]
+ B [i1..... in, ]
+
  *  Procesamiento Imagen GPU
  */
 __global__ void kernelGPU(float *R, float *G, float *B, float *Rout, float *Gout, float *Bout, int L,int M, int N){
-
+	int tid = threadIdx.x + blockDim.x * blockIdx.x;
+	
+	int imsize = M*N;
+	if( tid < imsize){
+		Rout[tid] = 0;
+		Gout[tid] = 0;
+		Bout[tid] = 0;
+		for (int i = 0; i < L; i++){
+			Rout[tid] += R[imsize*i + tid];
+			Gout[tid] += G[imsize*i + tid];
+			Bout[tid] += B[imsize*i + tid];
+		}
+		Rout[tid] /= L;
+		Gout[tid] /= L;
+		Bout[tid] /= L;
+	}
+	
 }
 
 /*
@@ -95,17 +119,20 @@ int main(int argc, char **argv){
     float *Rhostout, *Ghostout, *Bhostout;
     float *Rdev, *Gdev, *Bdev;
     float *Rdevout, *Gdevout, *Bdevout;
-    char names[2][3][30] = {
+    char names[6][3][30] = {
 		//Nombres
 
 		//-lee [0]------ escribe CPU [1]----- escribe GPU [2]
-		{"test.txt\0", "testCPU.txt\0", "testGPU.txt\0"},
+		{"images1.txt\0", "images1CPU.txt\0", "images1GPU.txt\0"},
+		{"images2.txt\0", "images2CPU.txt\0", "images2GPU.txt\0"},
+		{"images3.txt\0", "images3CPU.txt\0", "images3GPU.txt\0"},
+		{"images4.txt\0", "images4CPU.txt\0", "images4GPU.txt\0"},
+		{"images5.txt\0", "images5CPU.txt\0", "images5GPU.txt\0"},
 		{"images6.txt\0", "images6CPU.txt\0", "images6GPU.txt\0"},
-		//{"imgG.txt\0", "imgGCPU.txt\0", "imgGGPU.txt\0"}
 	
 	};
 
-    for (int i=0; i<2; i++){
+    for (int i=0; i<6; i++){
 	    Read(&Rhost, &Ghost, &Bhost, &L ,&M, &N, names[i][0]); // los ColorHost van a quedar de tamaño L*M*N
 
 	    /*
@@ -126,8 +153,14 @@ int main(int argc, char **argv){
 		Ghostout -> M*N
 		Bhostout -> M*N
 		*/
-
+		clock_t t1, t2;
+		t1 = clock();
 	    funcionCPU(Rhost, Ghost, Bhost, Rhostout, Ghostout, Bhostout, L,M, N);  //pasarle L
+		t2 = clock();
+
+		double ms = 1000.0 * (double)(t2 - t1) / CLOCKS_PER_SEC;
+		printf("Tiempo CPU Imagen %d : %f [ms]\n", i+1, ms); 
+
 	    Write(Rhostout, Ghostout, Bhostout, M, N, names[i][1]);
 
 	    delete[] Rhostout; delete[] Ghostout; delete[] Bhostout;
@@ -156,8 +189,21 @@ int main(int argc, char **argv){
 	    cudaMalloc((void**)&Gdevout, M * N * sizeof(float));
 	    cudaMalloc((void**)&Bdevout, M * N * sizeof(float));
 	    
+		// tiempos
+		cudaEvent_t ct1, ct2;
+		float dt;
+		cudaEventCreate(&ct1);
+		cudaEventCreate(&ct2);
+		cudaEventRecord(ct1);
+
 		//GPU
-	    kernelGPU<<<grid_size, block_size>>>(Rdev, Gdev, Bdev, Rdevout, Gdevout, Bdevout, L,M, N); //L
+	    kernelGPU<<<grid_size, block_size>>>(Rdev, Gdev, Bdev, Rdevout, Gdevout, Bdevout, L, M, N); 
+
+		cudaEventRecord(ct2);
+		cudaEventSynchronize(ct2);
+		cudaEventElapsedTime(&dt, ct1, ct2);
+		printf("Tiempo GPU Imagen %d: %f [ms]\n\n",i+1, dt);
+
 
 	    Rhostout = (float*)malloc(M*N*sizeof(float));
 	    Ghostout = (float*)malloc(M*N*sizeof(float));
